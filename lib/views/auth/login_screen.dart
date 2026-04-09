@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/app_colors.dart';
+import '../../services/validation_service.dart';
 import 'signup_screen.dart';
 import '../home/home_screen.dart';
 
@@ -14,7 +15,6 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
@@ -30,7 +30,6 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-
     if (!_formKey.currentState!.validate()) return;
 
     FocusScope.of(context).unfocus();
@@ -38,8 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = context.read<AuthProvider>();
 
     final success = await authProvider.login(
-      _emailController.text.trim(),
-      _passwordController.text.trim(),
+      _emailController.text,
+      _passwordController.text,
     );
 
     if (!mounted) return;
@@ -60,7 +59,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
-
     final authProvider = context.watch<AuthProvider>();
 
     return Scaffold(
@@ -72,17 +70,13 @@ class _LoginScreenState extends State<LoginScreen> {
             key: _formKey,
             child: Column(
               children: [
-
                 const SizedBox(height: 40),
-
                 Image.asset(
                   'assets/images/logo1.png',
                   width: 200,
                   height: 200,
                 ),
-
                 const SizedBox(height: 20),
-
                 Text(
                   'Connectez-vous à votre compte',
                   style: TextStyle(
@@ -90,17 +84,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-
                 const SizedBox(height: 40),
-
                 _buildEmailField(),
-
                 const SizedBox(height: 16),
-
                 _buildPasswordField(),
-
                 const SizedBox(height: 32),
-
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
@@ -112,13 +100,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 12),
-
                 _buildRoleSelector(authProvider),
-
                 const SizedBox(height: 24),
-
                 if (authProvider.errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
@@ -129,26 +113,38 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppColors.error),
                       ),
-                      child: Text(
-                        authProvider.errorMessage!,
-                        style: TextStyle(
-                          color: AppColors.error,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
+                      child: Column(
+                        children: [
+                          Text(
+                            authProvider.errorMessage!,
+                            style: TextStyle(
+                              color: AppColors.error,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (authProvider.loginLockoutTimeRemaining != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text(
+                                "Réessayez dans ${authProvider.loginLockoutTimeRemaining} secondes",
+                                style: TextStyle(
+                                  color: AppColors.error,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-
                 const SizedBox(height: 12),
-
                 SizedBox(
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: authProvider.isLoading
-                        ? null
-                        : _handleLogin,
+                    onPressed: authProvider.isLoading ? null : _handleLogin,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       shape: RoundedRectangleBorder(
@@ -156,8 +152,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                     child: authProvider.isLoading
-                        ? const CircularProgressIndicator(
-                            color: Colors.white)
+                        ? const CircularProgressIndicator(color: Colors.white)
                         : const Text(
                             'Se connecter',
                             style: TextStyle(
@@ -168,9 +163,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                   ),
                 ),
-
                 const SizedBox(height: 24),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -183,8 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                              builder: (_) =>
-                                  const SignupScreen()),
+                              builder: (_) => const SignupScreen()),
                         );
                       },
                       child: Text(
@@ -220,7 +212,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         Container(
-          height: 48,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -229,15 +220,18 @@ class _LoginScreenState extends State<LoginScreen> {
           child: TextFormField(
             controller: _emailController,
             keyboardType: TextInputType.emailAddress,
-            validator: (value) =>
-                value == null || value.isEmpty
-                    ? "Email requis"
-                    : null,
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return "Email requis";
+              }
+              return ValidationService.validateEmail(value);
+            },
             decoration: InputDecoration(
               hintText: "exemple@resapro.com",
               hintStyle: TextStyle(color: AppColors.textMuted),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             ),
           ),
         ),
@@ -260,7 +254,6 @@ class _LoginScreenState extends State<LoginScreen> {
           ),
         ),
         Container(
-          height: 48,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
@@ -270,19 +263,16 @@ class _LoginScreenState extends State<LoginScreen> {
             controller: _passwordController,
             obscureText: !_isPasswordVisible,
             validator: (value) =>
-                value == null || value.isEmpty
-                    ? "Mot de passe requis"
-                    : null,
+                value == null || value.isEmpty ? "Mot de passe requis" : null,
             decoration: InputDecoration(
               hintText: "••••••••",
               hintStyle: TextStyle(color: AppColors.textMuted),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _isPasswordVisible
-                      ? Icons.visibility_off
-                      : Icons.visibility,
+                  _isPasswordVisible ? Icons.visibility_off : Icons.visibility,
                   color: AppColors.textSecondary,
                 ),
                 onPressed: () {
@@ -301,27 +291,19 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildRoleSelector(AuthProvider authProvider) {
     return Row(
       children: [
-        _roleButton(authProvider, "User",
-            Icons.person, UserRole.user),
+        _roleButton(authProvider, "User", Icons.person, UserRole.user),
         const SizedBox(width: 12),
-        _roleButton(authProvider, "Manager",
-            Icons.manage_accounts,
-            UserRole.manager),
+        _roleButton(
+            authProvider, "Manager", Icons.manage_accounts, UserRole.manager),
         const SizedBox(width: 12),
-        _roleButton(authProvider, "Admin",
-            Icons.shield, UserRole.admin),
+        _roleButton(authProvider, "Admin", Icons.shield, UserRole.admin),
       ],
     );
   }
 
   Widget _roleButton(
-      AuthProvider provider,
-      String label,
-      IconData icon,
-      UserRole role) {
-
-    final isSelected =
-        provider.selectedRole == role;
+      AuthProvider provider, String label, IconData icon, UserRole role) {
+    final isSelected = provider.selectedRole == role;
 
     return Expanded(
       child: GestureDetector(
@@ -329,33 +311,24 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Container(
           height: 70,
           decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.primaryLight
-                : Colors.white,
-            borderRadius:
-                BorderRadius.circular(12),
+            color: isSelected ? AppColors.primaryLight : Colors.white,
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isSelected
-                  ? AppColors.primary
-                  : AppColors.border,
+              color: isSelected ? AppColors.primary : AppColors.border,
               width: isSelected ? 2 : 1,
             ),
           ),
           child: Column(
-            mainAxisAlignment:
-                MainAxisAlignment.center,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(icon,
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textSecondary),
+                  color:
+                      isSelected ? AppColors.primary : AppColors.textSecondary),
               const SizedBox(height: 4),
               Text(
                 label,
                 style: TextStyle(
-                  color: isSelected
-                      ? AppColors.primary
-                      : AppColors.textPrimary,
+                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
                 ),
               ),
             ],
