@@ -1,4 +1,3 @@
-
 class ValidationService {
   static const int minPasswordLength = 8;
 
@@ -6,7 +5,6 @@ class ValidationService {
 
   static const int minNameLength = 2;
   static const int maxNameLength = 100;
-
 
   static String? validateEmail(String email) {
     email = email.trim();
@@ -28,7 +26,6 @@ class ValidationService {
 
     return null;
   }
-
 
   static String? validatePassword(String password) {
     if (password.isEmpty) {
@@ -103,7 +100,6 @@ class ValidationService {
     return null;
   }
 
-  
   static String? validateLoginForm({
     required String email,
     required String password,
@@ -118,9 +114,23 @@ class ValidationService {
     return null;
   }
 
+  static String? validateConfirmPassword({
+    required String password,
+    required String confirmPassword,
+  }) {
+    if (confirmPassword.isEmpty) {
+      return "La confirmation du mot de passe est requise";
+    }
+
+    if (password != confirmPassword) {
+      return "Les mots de passe ne correspondent pas";
+    }
+
+    return null;
+  }
+
   static String sanitizeInput(String input) {
-    return input.trim().replaceAll(
-        RegExp(r'[<>"]'), ''); 
+    return input.trim().replaceAll(RegExp(r'[<>"]'), '');
   }
 
   static List<String> getPasswordRequirements() {

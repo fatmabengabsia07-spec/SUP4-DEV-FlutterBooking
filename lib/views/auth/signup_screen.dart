@@ -16,8 +16,10 @@ class _SignupScreenState extends State<SignupScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
   bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
   int _passwordStrength = 0;
 
   @override
@@ -25,6 +27,7 @@ class _SignupScreenState extends State<SignupScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
@@ -36,6 +39,27 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _handleSignup() async {
     final authProvider = context.read<AuthProvider>();
+
+    final signupValidationError = ValidationService.validateSignupForm(
+      name: _nameController.text,
+      email: _emailController.text,
+      password: _passwordController.text,
+    );
+
+    if (signupValidationError != null) {
+      authProvider.setError(signupValidationError);
+      return;
+    }
+
+    final confirmPasswordError = ValidationService.validateConfirmPassword(
+      password: _passwordController.text,
+      confirmPassword: _confirmPasswordController.text,
+    );
+
+    if (confirmPasswordError != null) {
+      authProvider.setError(confirmPasswordError);
+      return;
+    }
 
     final success = await authProvider.signup(
       _nameController.text,
@@ -57,6 +81,7 @@ class _SignupScreenState extends State<SignupScreen> {
       _nameController.clear();
       _emailController.clear();
       _passwordController.clear();
+      _confirmPasswordController.clear();
 
       Navigator.pushReplacement(
         context,
@@ -111,6 +136,8 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                     const SizedBox(height: 16),
                     _buildSecurePasswordField(),
+                    const SizedBox(height: 16),
+                    _buildConfirmPasswordField(),
                   ],
                 ),
               ),
@@ -259,7 +286,8 @@ class _SignupScreenState extends State<SignupScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: passwordError == null ? AppColors.success : AppColors.primary,
+              color:
+                  passwordError == null ? AppColors.success : AppColors.primary,
               width: 2,
             ),
           ),
@@ -340,6 +368,65 @@ class _SignupScreenState extends State<SignupScreen> {
     );
   }
 
+  Widget _buildConfirmPasswordField() {
+    final confirmPasswordError = ValidationService.validateConfirmPassword(
+      password: _passwordController.text,
+      confirmPassword: _confirmPasswordController.text,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Confirmer le mot de passe',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: confirmPasswordError == null
+                  ? AppColors.success
+                  : AppColors.primary,
+              width: 2,
+            ),
+          ),
+          child: TextField(
+            controller: _confirmPasswordController,
+            obscureText: !_isConfirmPasswordVisible,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              hintText: '••••••••',
+              hintStyle: TextStyle(color: AppColors.textMuted),
+              border: InputBorder.none,
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _isConfirmPasswordVisible
+                      ? Icons.visibility_off
+                      : Icons.visibility,
+                  color: AppColors.textSecondary,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                  });
+                },
+              ),
+            ),
+          ),
+        ),
+        _buildValidationError(confirmPasswordError) ?? const SizedBox(),
+      ],
+    );
+  }
+
   Widget _buildPasswordRequirements() {
     final requirements = ValidationService.getPasswordRequirements();
     final password = _passwordController.text;
@@ -378,7 +465,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   Text(
                     req,
                     style: TextStyle(
-                      color: isMet ? AppColors.success : AppColors.textSecondary,
+                      color:
+                          isMet ? AppColors.success : AppColors.textSecondary,
                       fontSize: 12,
                       fontWeight: isMet ? FontWeight.w600 : FontWeight.w400,
                     ),

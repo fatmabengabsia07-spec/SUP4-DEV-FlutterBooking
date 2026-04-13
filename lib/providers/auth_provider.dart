@@ -5,6 +5,7 @@ import '../models/user.dart';
 import '../services/validation_service.dart';
 import '../services/auth_error_handler.dart';
 import '../services/rate_limit_service.dart';
+import '../services/auth_preferences_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
@@ -19,6 +20,8 @@ class AuthProvider with ChangeNotifier {
 
   bool _isEmailVerified = false;
   int? _loginLockoutTimeRemaining;
+  bool _rememberMe = false;
+  String? _rememberedEmail;
 
   User? get currentUser => _currentUser;
   UserRole get selectedRole => _selectedRole;
@@ -27,13 +30,36 @@ class AuthProvider with ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isEmailVerified => _isEmailVerified;
   int? get loginLockoutTimeRemaining => _loginLockoutTimeRemaining;
+  bool get rememberMe => _rememberMe;
+  String? get rememberedEmail => _rememberedEmail;
+
+  Future<void> loadRememberedCredentials() async {
+    _rememberMe = await AuthPreferencesService.getRememberMe();
+    _rememberedEmail =
+        _rememberMe ? await AuthPreferencesService.getRememberedEmail() : null;
+    notifyListeners();
+  }
+
+  Future<void> initializeAuthState() async {
+    await loadRememberedCredentials();
+
+    if (!_rememberMe) {
+      if (_auth.currentUser != null) {
+        await _auth.signOut();
+      }
+      _currentUser = null;
+      notifyListeners();
+      return;
+    }
+
+    await checkAuthStatus();
+  }
 
   void setRole(UserRole role) {
     _selectedRole = role;
     notifyListeners();
   }
 
-  
   Future<bool> signup(String name, String email, String password) async {
     _errorMessage = null;
     _isLoading = true;
@@ -54,7 +80,6 @@ class AuthProvider with ChangeNotifier {
         return false;
       }
 
-      // 2. RATE LIMITING - Vérifier si email peut s'inscrire
       if (!RateLimitService.canAttemptSignup(email)) {
         _errorMessage = "Trop de tentatives d'inscription. Réessayez plus tard";
         _isLoading = false;
@@ -82,9 +107,8 @@ class AuthProvider with ChangeNotifier {
         "photoPath": null,
         "birthDate": null,
         "createdAt": DateTime.now().toIso8601String(),
-        "emailVerified": false, 
-        "lastPasswordChange":
-            DateTime.now().toIso8601String(), 
+        "emailVerified": false,
+        "lastPasswordChange": DateTime.now().toIso8601String(),
       };
 
       await _firestore.collection("users").doc(uid).set(userData);
@@ -98,7 +122,6 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      
       RateLimitService.recordFailedSignupAttempt(email);
 
       _errorMessage = AuthErrorHandler.handleAuthError(e);
@@ -108,7 +131,8 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<bool> login(String email, String password) async {
+  Future<bool> login(String email, String password,
+      {required bool rememberMe}) async {
     _errorMessage = null;
     _isLoading = true;
     _loginLockoutTimeRemaining = null;
@@ -152,7 +176,6 @@ class AuthProvider with ChangeNotifier {
       final doc = await _firestore.collection("users").doc(uid).get();
 
       if (!doc.exists) {
-      
         final userData = {
           "name": sanitizedEmail,
           "email": sanitizedEmail,
@@ -173,13 +196,26 @@ class AuthProvider with ChangeNotifier {
       }
 
       if (_currentUser!.role != _selectedRole) {
-        // Enregistrer la tentative échouée
         RateLimitService.recordFailedLoginAttempt(sanitizedEmail);
+
+        await _auth.signOut();
+        _currentUser = null;
 
         _errorMessage = "Email ou mot de passe incorrect";
         _isLoading = false;
         notifyListeners();
         return false;
+      }
+
+      _rememberMe = rememberMe;
+      await AuthPreferencesService.setRememberMe(rememberMe);
+
+      if (rememberMe) {
+        await AuthPreferencesService.setRememberedEmail(sanitizedEmail);
+        _rememberedEmail = sanitizedEmail;
+      } else {
+        await AuthPreferencesService.clearRememberedEmail();
+        _rememberedEmail = null;
       }
 
       RateLimitService.clearLoginAttempts(sanitizedEmail);
@@ -188,12 +224,43 @@ class AuthProvider with ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-     
       RateLimitService.recordFailedLoginAttempt(email);
 
       _errorMessage = AuthErrorHandler.handleAuthError(e);
       _isLoading = false;
       notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> sendPasswordResetEmail(String email) async {
+    _errorMessage = null;
+
+    try {
+      final emailError = ValidationService.validateEmail(email);
+      if (emailError != null) {
+        _errorMessage = emailError;
+        return false;
+      }
+
+      final sanitizedEmail = email.toLowerCase().trim();
+      final actionCodeSettings = firebase_auth.ActionCodeSettings(
+        url: 'https://drive-5e3cd.firebaseapp.com/__/auth/action',
+        handleCodeInApp: false,
+        androidPackageName: 'com.example.projet',
+        androidInstallApp: true,
+        iOSBundleId: 'com.example.projet',
+      );
+
+      await _auth.sendPasswordResetEmail(
+        email: sanitizedEmail,
+        actionCodeSettings: actionCodeSettings,
+      );
+
+      return true;
+    } catch (e) {
+      debugPrint('sendPasswordResetEmail error: $e');
+      _errorMessage = AuthErrorHandler.handleAuthError(e);
       return false;
     }
   }
@@ -224,6 +291,9 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     await _auth.signOut();
+    await AuthPreferencesService.clearRememberedSession();
+    _rememberMe = false;
+    _rememberedEmail = null;
     _currentUser = null;
     notifyListeners();
   }

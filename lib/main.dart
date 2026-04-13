@@ -11,7 +11,7 @@ import 'providers/resource_provider.dart';
 import 'providers/reservation_provider.dart';
 import 'providers/calendar_provider.dart';
 
-import 'views/auth/login_screen.dart';
+import 'views/auth/auth_gate.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,24 +30,19 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-
         ChangeNotifierProvider(
           create: (_) => AuthProvider(),
         ),
-
         ChangeNotifierProvider(
           create: (_) => ResourceProvider(),
         ),
-
         ChangeNotifierProvider(
           create: (_) => ReservationProvider(),
         ),
-
         ChangeNotifierProvider(
           create: (_) => CalendarProvider(),
         ),
         ChangeNotifierProvider(create: (_) => ManagerProvider()),
-
       ],
       child: MaterialApp(
         title: 'ResaPro',
@@ -58,7 +53,7 @@ class MyApp extends StatelessWidget {
           textTheme: GoogleFonts.interTextTheme(),
           useMaterial3: true,
         ),
-        home: const LoginScreen(),
+        home: const AuthGate(),
       ),
     );
   }

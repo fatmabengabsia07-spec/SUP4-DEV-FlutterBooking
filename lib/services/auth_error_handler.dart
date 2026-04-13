@@ -1,8 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 
-
 class AuthErrorHandler {
-
   static String handleAuthError(dynamic exception) {
     if (exception is firebase_auth.FirebaseAuthException) {
       switch (exception.code) {
@@ -28,6 +26,12 @@ class AuthErrorHandler {
           return "Trop de tentatives. Veuillez réessayer plus tard";
         case 'operation-not-allowed':
           return "Cette opération n'est pas autorisée";
+        case 'invalid-continue-uri':
+          return "Lien de réinitialisation invalide. Vérifiez la configuration Firebase";
+        case 'unauthorized-continue-uri':
+          return "Domaine non autorisé pour la réinitialisation du mot de passe";
+        case 'missing-continue-uri':
+          return "Configuration de réinitialisation incomplète côté Firebase";
         case 'requires-recent-login':
           return "Veuillez vous reconnecter pour effectuer cette action";
 
