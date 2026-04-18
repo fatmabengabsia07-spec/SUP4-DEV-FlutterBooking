@@ -84,7 +84,9 @@ class ReservationScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        "${resource.type} • ${resource.capacity} pers.",
+                        resource.isSalle
+                            ? "${resource.type} • ${resource.capacity} pers."
+                            : resource.type,
                         style: TextStyle(
                           color: AppColors.textSecondary,
                         ),
@@ -95,9 +97,7 @@ class ReservationScreen extends StatelessWidget {
               ],
             ),
           ),
-
           const SizedBox(height: 12),
-
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
             padding: const EdgeInsets.all(12),
@@ -129,9 +129,7 @@ class ReservationScreen extends StatelessWidget {
               ),
             ),
           ),
-
           const SizedBox(height: 12),
-
           Expanded(
             child: Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -217,7 +215,6 @@ class ReservationScreen extends StatelessWidget {
               ),
             ),
           ),
-
           if (rp.error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -236,7 +233,6 @@ class ReservationScreen extends StatelessWidget {
                 ),
               ),
             ),
-
           Padding(
             padding: const EdgeInsets.all(16),
             child: SizedBox(
@@ -252,8 +248,8 @@ class ReservationScreen extends StatelessWidget {
                 onPressed: rp.loading
                     ? null
                     : () async {
-                        final uid =
-                            firebase_auth.FirebaseAuth.instance.currentUser?.uid;
+                        final uid = firebase_auth
+                            .FirebaseAuth.instance.currentUser?.uid;
 
                         if (uid == null) return;
 

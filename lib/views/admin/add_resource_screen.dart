@@ -31,6 +31,9 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
 
   bool get isEdit => widget.resource != null;
 
+  bool get _isSalleSelected =>
+      _selectedType.trim().toLowerCase().startsWith('salle');
+
   @override
   void initState() {
     super.initState();
@@ -55,8 +58,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
 
   /// 📸 PICK IMAGE
   Future<void> _pickImage() async {
-    final picked =
-        await ImagePicker().pickImage(source: ImageSource.gallery);
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
 
     if (picked != null) {
       setState(() {
@@ -83,7 +85,6 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
 
   /// 💾 SAVE
   Future<void> _saveResource() async {
-
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -99,7 +100,8 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
       id: '',
       name: _nameController.text.trim(),
       type: _selectedType, // 🔥 DROPDOWN
-      capacity: int.tryParse(_capacityController.text) ?? 0,
+      capacity:
+          _isSalleSelected ? int.tryParse(_capacityController.text) ?? 0 : 0,
       description: _descriptionController.text.trim(),
       imageUrl: _imagePath ?? '',
     );
@@ -118,7 +120,6 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
         );
 
         await provider.update(updated);
-
       } else {
         await provider.add(resource);
       }
@@ -136,7 +137,6 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
           ),
         );
       }
-
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Erreur: $e")),
@@ -163,8 +163,7 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
           decoration: InputDecoration(
             labelText: label,
             border: InputBorder.none,
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 16),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16),
           ),
         ),
       ),
@@ -216,12 +215,10 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
         ),
         iconTheme: const IconThemeData(color: AppColors.primary),
       ),
-
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           children: [
-
             /// IMAGE
             GestureDetector(
               onTap: _pickImage,
@@ -243,11 +240,12 @@ class _AddResourceScreenState extends State<AddResourceScreen> {
             /// 🔥 DROPDOWN TYPE
             _buildDropdown(),
 
-            _buildField(
-              "Capacité",
-              _capacityController,
-              keyboardType: TextInputType.number,
-            ),
+            if (_isSalleSelected)
+              _buildField(
+                "Capacité",
+                _capacityController,
+                keyboardType: TextInputType.number,
+              ),
 
             _buildField("Description", _descriptionController),
 

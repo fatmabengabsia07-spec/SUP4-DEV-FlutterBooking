@@ -15,6 +15,8 @@ class Resource {
     required this.imageUrl,
   });
 
+  bool get isSalle => type.trim().toLowerCase().startsWith('salle');
+
   factory Resource.fromFirestore(String id, Map<String, dynamic> data) {
     return Resource(
       id: id,
@@ -26,14 +28,14 @@ class Resource {
     );
   }
 
- Map<String, dynamic> toMap({bool isUpdate = false}) {
-  return {
-    'name': name,
-    'type': type,
-    'capacity': capacity,
-    'description': description,
-    'imageUrl': imageUrl,
-    if (!isUpdate) 'createdAt': DateTime.now(),
-  };
-}
+  Map<String, dynamic> toMap({bool isUpdate = false}) {
+    return {
+      'name': name,
+      'type': type,
+      'capacity': capacity,
+      'description': description,
+      'imageUrl': imageUrl,
+      if (!isUpdate) 'createdAt': DateTime.now(),
+    };
+  }
 }

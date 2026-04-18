@@ -122,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icon(Icons.home),
           label: "Accueil",
         ),
-         BottomNavigationBarItem(
+        BottomNavigationBarItem(
           icon: Icon(Icons.calendar_today),
           label: "Réservations",
         ),
@@ -134,7 +134,6 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: Icon(Icons.fact_check),
           label: "Traitées",
         ),
-       
         BottomNavigationBarItem(
           icon: Icon(Icons.logout),
           label: "Déco",
@@ -186,7 +185,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
         case 3:
           return const ReviewedReservationsScreen();
-
 
         default:
           return _buildHomeContent();
@@ -280,6 +278,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           child: ResourceCard(
                             imageUrl: resource.imageUrl,
                             title: resource.name,
+                            type: resource.type,
+                            capacity: resource.capacity,
                             description: resource.description,
                           ),
                         ),
