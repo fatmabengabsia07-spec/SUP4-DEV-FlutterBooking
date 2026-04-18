@@ -10,6 +10,7 @@ import 'providers/auth_provider.dart';
 import 'providers/resource_provider.dart';
 import 'providers/reservation_provider.dart';
 import 'providers/calendar_provider.dart';
+import 'services/notification_service.dart';
 
 import 'views/auth/auth_gate.dart';
 
@@ -19,6 +20,10 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
+  // Initialize notification service
+  final notificationService = NotificationService();
+  await notificationService.initialize();
 
   runApp(const MyApp());
 }

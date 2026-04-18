@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:projet/models/reservation.dart';
 import '../services/reservation_service.dart';
-import '../services/notification_service.dart';  // Importez le service de notification
+import '../services/notification_service.dart'; // Importez le service de notification
 
 class ReservationProvider with ChangeNotifier {
   final ReservationService _service = ReservationService();
-  final NotificationService _notificationService = NotificationService();  // Initialisation du service de notification
+  final NotificationService _notificationService =
+      NotificationService(); // Initialisation du service de notification
 
   DateTime selectedDay = DateTime.now();
   int? selectedHour;
@@ -67,7 +68,6 @@ class ReservationProvider with ChangeNotifier {
       );
 
       await _notificationService.showNotification(
-        id: 0,
         title: 'Réservation en cours de traitement.',
         body: 'Votre réservation pour la ressource est en cours de traitement.',
       );
@@ -95,7 +95,6 @@ class ReservationProvider with ChangeNotifier {
     await _service.updateReservationStatus(id, "cancelled");
 
     await _notificationService.showNotification(
-      id: 1,
       title: 'Réservation annulée',
       body: 'Votre réservation a été annulée.',
     );
@@ -132,7 +131,6 @@ class ReservationProvider with ChangeNotifier {
       );
 
       await _notificationService.showNotification(
-        id: 2,
         title: 'Réservation modifiée',
         body: 'Votre réservation a été modifiée avec succès.',
       );
@@ -173,7 +171,6 @@ class ReservationProvider with ChangeNotifier {
       );
 
       await _notificationService.showNotification(
-        id: 3,
         title: 'Réservation approuvée',
         body: 'La réservation a été approuvée .',
       );
@@ -206,7 +203,6 @@ class ReservationProvider with ChangeNotifier {
       );
 
       await _notificationService.showNotification(
-        id: 4,
         title: 'Réservation rejetée',
         body: 'La réservation a été rejetée .',
       );
