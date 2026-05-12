@@ -12,11 +12,12 @@ class EditReservationScreen extends StatefulWidget {
   const EditReservationScreen({super.key, required this.reservation});
 
   @override
-  State<EditReservationScreen> createState() =>
-      _EditReservationScreenState();
+  State<EditReservationScreen> createState() => _EditReservationScreenState();
 }
 
 class _EditReservationScreenState extends State<EditReservationScreen> {
+  bool get _isApproved =>
+      widget.reservation.status == ReservationStatus.approved;
 
   @override
   void initState() {
@@ -31,6 +32,8 @@ class _EditReservationScreenState extends State<EditReservationScreen> {
   @override
   Widget build(BuildContext context) {
     final rp = Provider.of<ReservationProvider>(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
 
     return Scaffold(
       appBar: AppBar(
@@ -39,7 +42,6 @@ class _EditReservationScreenState extends State<EditReservationScreen> {
       ),
       body: Column(
         children: [
-
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(12),
@@ -47,111 +49,150 @@ class _EditReservationScreenState extends State<EditReservationScreen> {
               color: AppColors.background,
               borderRadius: BorderRadius.circular(16),
             ),
-            child: TableCalendar(
-              firstDay: DateTime.now(),
-              lastDay: DateTime.now().add(const Duration(days: 120)),
-              focusedDay: rp.selectedDay,
-              selectedDayPredicate: (day) =>
-                  isSameDay(day, rp.selectedDay),
-              onDaySelected: (selectedDay, _) {
-                rp.setDay(selectedDay);
-              },
-              calendarStyle: const CalendarStyle(
-                todayDecoration: BoxDecoration(
-                  color: AppColors.textPrimary,
-                  shape: BoxShape.circle,
+            child: Builder(builder: (context) {
+              final firstDay = today;
+              final lastDay = today.add(const Duration(days: 365));
+
+              return TableCalendar(
+                firstDay: firstDay,
+                lastDay: lastDay,
+                focusedDay: rp.selectedDay,
+                selectedDayPredicate: (day) => isSameDay(day, rp.selectedDay),
+                enabledDayPredicate: (day) {
+                  final normalized = DateTime(day.year, day.month, day.day);
+                  return !normalized.isBefore(today);
+                },
+                onDaySelected: _isApproved
+                    ? null
+                    : (selectedDay, _) {
+                        rp.setDay(selectedDay);
+                      },
+                calendarStyle: const CalendarStyle(
+                  todayDecoration: BoxDecoration(
+                    color: AppColors.textPrimary,
+                    shape: BoxShape.circle,
+                  ),
+                  selectedDecoration: BoxDecoration(
+                    color: AppColors.primary,
+                    shape: BoxShape.circle,
+                  ),
                 ),
-                selectedDecoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
+                headerStyle: const HeaderStyle(
+                  formatButtonVisible: false,
+                  titleCentered: true,
                 ),
-              ),
-              headerStyle: const HeaderStyle(
-                formatButtonVisible: false,
-                titleCentered: true,
-              ),
-            ),
+              );
+            }),
           ),
-
           Expanded(
-            child: StreamBuilder(
-              stream: rp.reservationsForDay(widget.reservation.resourceId),
-              builder: (context, snapshot) {
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 300),
+              child: StreamBuilder(
+                key: ValueKey(
+                    '${rp.selectedDay.year}-${rp.selectedDay.month}-${rp.selectedDay.day}'),
+                stream: rp.reservationsForDay(widget.reservation.resourceId),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
 
-                final reservedHours = <int>{};
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Erreur: ${snapshot.error}'),
+                    );
+                  }
 
-                if (snapshot.hasData) {
-                  final list = snapshot.data!;
-                  for (final r in list) {
-                    if (r.id != widget.reservation.id) {
-                      reservedHours.add(r.startAt.hour);
+                  final reservedHours = <int>{};
+
+                  if (snapshot.hasData) {
+                    final list = snapshot.data!;
+                    for (final r in list) {
+                      if (r.id != widget.reservation.id) {
+                        reservedHours.add(r.startAt.hour);
+                      }
                     }
                   }
-                }
 
-                return ListView.builder(
-                  itemCount: 10,
-                  itemBuilder: (context, index) {
+                  return ListView.builder(
+                    itemCount: 10,
+                    itemBuilder: (context, index) {
+                      final hour = 8 + index;
+                      final isReserved = reservedHours.contains(hour);
+                      final selectedDate = DateTime(
+                        rp.selectedDay.year,
+                        rp.selectedDay.month,
+                        rp.selectedDay.day,
+                      );
+                      final slotStart = DateTime(
+                        selectedDate.year,
+                        selectedDate.month,
+                        selectedDate.day,
+                        hour,
+                      );
+                      final isPastHour = slotStart.isBefore(now);
+                      final isSelected = rp.selectedHour == hour;
+                      final isLocked = _isApproved;
+                      final isUnavailable =
+                          isReserved || isLocked || isPastHour;
 
-                    final hour = 8 + index;
-                    final isReserved = reservedHours.contains(hour);
-                    final isSelected = rp.selectedHour == hour;
-
-                    return GestureDetector(
-                      onTap: isReserved ? null : () => rp.setHour(hour),
-                      child: Container(
-                        margin: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppColors.primary
-                                : AppColors.success,
-                            width: isSelected ? 2 : 1,
+                      return GestureDetector(
+                        onTap: isUnavailable ? null : () => rp.setHour(hour),
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 6),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : AppColors.success,
+                              width: isSelected ? 2 : 1,
+                            ),
+                            color: isUnavailable
+                                ? Colors.grey.shade200
+                                : (isSelected
+                                    ? AppColors.primary.withOpacity(0.1)
+                                    : Colors.white),
                           ),
-                          color: isReserved
-                              ? Colors.grey.shade200
-                              : (isSelected
-                                  ? AppColors.primary.withOpacity(0.1)
-                                  : Colors.white),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              "${hour.toString().padLeft(2, '0')}:00",
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: isReserved
-                                    ? Colors.grey
-                                    : Colors.black,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                "${hour.toString().padLeft(2, '0')}:00",
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: isUnavailable
+                                      ? Colors.grey
+                                      : Colors.black,
+                                ),
                               ),
-                            ),
-
-                            Text(
-                              isReserved
-                                  ? "Indisponible"
-                                  : (isSelected
-                                      ? "Sélectionné"
-                                      : "Disponible"),
-                              style: TextStyle(
-                                color: isReserved
-                                    ? Colors.grey
-                                    : AppColors.primary,
+                              Text(
+                                (isReserved || isLocked)
+                                    ? "Indisponible"
+                                    : (isPastHour
+                                        ? "Passée"
+                                        : (isSelected
+                                            ? "Sélectionné"
+                                            : "Disponible")),
+                                style: TextStyle(
+                                  color: isUnavailable
+                                      ? Colors.grey
+                                      : AppColors.primary,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  },
-                );
-              },
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
-
           if (rp.error != null)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -163,7 +204,17 @@ class _EditReservationScreenState extends State<EditReservationScreen> {
                 ),
               ),
             ),
-
+          if (_isApproved)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                "Cette réservation est approuvée par le manager et ne peut plus être modifiée.",
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.all(16),
             child: SizedBox(
@@ -176,28 +227,27 @@ class _EditReservationScreenState extends State<EditReservationScreen> {
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
-                onPressed: () async {
+                onPressed: _isApproved
+                    ? null
+                    : () async {
+                        final ok = await rp.updateReservation(
+                          id: widget.reservation.id,
+                          durationMinutes: 60,
+                        );
 
-                  final ok = await rp.updateReservation(
-                    id: widget.reservation.id,
-                    durationMinutes: 60,
-                  );
+                        if (ok && context.mounted) {
+                          Navigator.pop(context);
 
-                  if (ok && context.mounted) {
-                    Navigator.pop(context);
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("Réservation modifiée avec succès"),
-                      ),
-                    );
-                  }
-                },
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text("Réservation modifiée avec succès"),
+                            ),
+                          );
+                        }
+                      },
                 child: const Text(
                   "Valider modification",
-                  style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
             ),

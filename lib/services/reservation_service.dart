@@ -37,18 +37,18 @@ class ReservationService {
         .orderBy('startAt')
         .snapshots()
         .asyncMap((snap) async {
-          final reservations = await Future.wait(snap.docs.map((d) async {
-            final reservation = Reservation.fromFirestore(d.id, d.data());
-            final resourceName = await getResourceName(reservation.resourceId);
-            final userName = await getUserName(reservation.userId);
-            return reservation.copyWith(
-              resourceName: resourceName,
-              userName: userName,
-            );
-          }).toList());
+      final reservations = await Future.wait(snap.docs.map((d) async {
+        final reservation = Reservation.fromFirestore(d.id, d.data());
+        final resourceName = await getResourceName(reservation.resourceId);
+        final userName = await getUserName(reservation.userId);
+        return reservation.copyWith(
+          resourceName: resourceName,
+          userName: userName,
+        );
+      }).toList());
 
-          return reservations;
-        });
+      return reservations;
+    });
   }
 
   Future<void> createReservation({
@@ -99,17 +99,17 @@ class ReservationService {
         .orderBy('startAt', descending: true)
         .snapshots()
         .asyncMap((snap) async {
-          final reservations = await Future.wait(snap.docs.map((d) async {
-            final reservation = Reservation.fromFirestore(d.id, d.data());
-            final resourceName = await getResourceName(reservation.resourceId);
-            final userName = await getUserName(reservation.userId);
-            return reservation.copyWith(
-              resourceName: resourceName,
-              userName: userName,
-            );
-          }).toList());
-          return reservations;
-        });
+      final reservations = await Future.wait(snap.docs.map((d) async {
+        final reservation = Reservation.fromFirestore(d.id, d.data());
+        final resourceName = await getResourceName(reservation.resourceId);
+        final userName = await getUserName(reservation.userId);
+        return reservation.copyWith(
+          resourceName: resourceName,
+          userName: userName,
+        );
+      }).toList());
+      return reservations;
+    });
   }
 
   Future<void> deleteReservation(String id) async {
@@ -137,6 +137,7 @@ class ReservationService {
 
       final doc = await tx.get(docRef);
       final resourceId = doc['resourceId'];
+      final currentStatus = doc['status'] as String?;
 
       final conflictQuery = await reservationsRef
           .where('resourceId', isEqualTo: resourceId)
@@ -154,10 +155,18 @@ class ReservationService {
         throw Exception("Créneau déjà réservé");
       }
 
-      tx.update(docRef, {
+      final updateData = <String, dynamic>{
         "startAt": Timestamp.fromDate(startAt),
         "endAt": Timestamp.fromDate(endAt),
-      });
+      };
+
+      if (currentStatus == 'rejected') {
+        updateData['status'] = 'pending';
+        updateData['managerId'] = FieldValue.delete();
+        updateData['managerComment'] = FieldValue.delete();
+      }
+
+      tx.update(docRef, updateData);
     });
   }
 
@@ -168,17 +177,17 @@ class ReservationService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .asyncMap((snap) async {
-          final reservations = await Future.wait(snap.docs.map((d) async {
-            final reservation = Reservation.fromFirestore(d.id, d.data());
-            final resourceName = await getResourceName(reservation.resourceId);
-            final userName = await getUserName(reservation.userId);
-            return reservation.copyWith(
-              resourceName: resourceName,
-              userName: userName,
-            );
-          }).toList());
-          return reservations;
-        });
+      final reservations = await Future.wait(snap.docs.map((d) async {
+        final reservation = Reservation.fromFirestore(d.id, d.data());
+        final resourceName = await getResourceName(reservation.resourceId);
+        final userName = await getUserName(reservation.userId);
+        return reservation.copyWith(
+          resourceName: resourceName,
+          userName: userName,
+        );
+      }).toList());
+      return reservations;
+    });
   }
 
   Stream<List<Reservation>> streamAllReservations() {
@@ -187,17 +196,17 @@ class ReservationService {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .asyncMap((snap) async {
-          final reservations = await Future.wait(snap.docs.map((d) async {
-            final reservation = Reservation.fromFirestore(d.id, d.data());
-            final resourceName = await getResourceName(reservation.resourceId);
-            final userName = await getUserName(reservation.userId);
-            return reservation.copyWith(
-              resourceName: resourceName,
-              userName: userName,
-            );
-          }).toList());
-          return reservations;
-        });
+      final reservations = await Future.wait(snap.docs.map((d) async {
+        final reservation = Reservation.fromFirestore(d.id, d.data());
+        final resourceName = await getResourceName(reservation.resourceId);
+        final userName = await getUserName(reservation.userId);
+        return reservation.copyWith(
+          resourceName: resourceName,
+          userName: userName,
+        );
+      }).toList());
+      return reservations;
+    });
   }
 
   Future<void> approveReservation({
@@ -205,10 +214,24 @@ class ReservationService {
     required String managerId,
     String? comment,
   }) async {
-    await _db.collection('reservations').doc(reservationId).update({
-      "status": "approved",
-      "managerId": managerId,
-      "managerComment": comment ?? "",
+    final reservationRef = _db.collection('reservations').doc(reservationId);
+
+    await _db.runTransaction((tx) async {
+      final doc = await tx.get(reservationRef);
+      if (!doc.exists) {
+        throw Exception("Réservation introuvable.");
+      }
+
+      final currentStatus = doc.data()?['status'] as String?;
+      if (currentStatus != 'pending') {
+        throw Exception("Cette réservation a déjà été traitée.");
+      }
+
+      tx.update(reservationRef, {
+        "status": "approved",
+        "managerId": managerId,
+        "managerComment": comment ?? "",
+      });
     });
   }
 
@@ -217,30 +240,45 @@ class ReservationService {
     required String managerId,
     String? comment,
   }) async {
-    await _db.collection('reservations').doc(reservationId).update({
-      "status": "rejected",
-      "managerId": managerId,
-      "managerComment": comment ?? "",
+    final reservationRef = _db.collection('reservations').doc(reservationId);
+
+    await _db.runTransaction((tx) async {
+      final doc = await tx.get(reservationRef);
+      if (!doc.exists) {
+        throw Exception("Réservation introuvable.");
+      }
+
+      final currentStatus = doc.data()?['status'] as String?;
+      if (currentStatus != 'pending') {
+        throw Exception("Cette réservation a déjà été traitée.");
+      }
+
+      tx.update(reservationRef, {
+        "status": "rejected",
+        "managerId": managerId,
+        "managerComment": comment ?? "",
+      });
     });
   }
 
-  Stream<List<Reservation>> streamReservationsReviewedByManager(String managerId) {
+  Stream<List<Reservation>> streamReservationsReviewedByManager(
+      String managerId) {
     return _db
         .collection('reservations')
         .where('managerId', isEqualTo: managerId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .asyncMap((snap) async {
-          final reservations = await Future.wait(snap.docs.map((d) async {
-            final reservation = Reservation.fromFirestore(d.id, d.data());
-            final resourceName = await getResourceName(reservation.resourceId);
-            final userName = await getUserName(reservation.userId);
-            return reservation.copyWith(
-              resourceName: resourceName,
-              userName: userName,
-            );
-          }).toList());
-          return reservations;
-        });
+      final reservations = await Future.wait(snap.docs.map((d) async {
+        final reservation = Reservation.fromFirestore(d.id, d.data());
+        final resourceName = await getResourceName(reservation.resourceId);
+        final userName = await getUserName(reservation.userId);
+        return reservation.copyWith(
+          resourceName: resourceName,
+          userName: userName,
+        );
+      }).toList());
+      return reservations;
+    });
   }
 }

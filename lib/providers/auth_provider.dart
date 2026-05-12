@@ -6,9 +6,14 @@ import '../services/validation_service.dart';
 import '../services/auth_error_handler.dart';
 import '../services/rate_limit_service.dart';
 import '../services/auth_preferences_service.dart';
+import '../services/notification_service.dart';
+import '../services/realtime_reservation_notification_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final firebase_auth.FirebaseAuth _auth = firebase_auth.FirebaseAuth.instance;
+  final NotificationService _notificationService = NotificationService();
+  final RealtimeReservationNotificationService _realtimeNotificationService =
+      RealtimeReservationNotificationService();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
@@ -47,6 +52,7 @@ class AuthProvider with ChangeNotifier {
       if (_auth.currentUser != null) {
         await _auth.signOut();
       }
+      await _realtimeNotificationService.stop();
       _currentUser = null;
       notifyListeners();
       return;
@@ -117,6 +123,8 @@ class AuthProvider with ChangeNotifier {
 
       _currentUser = User.fromJson(userData, uid);
       _isEmailVerified = false;
+      await _notificationService.syncFcmTokenForUser(uid);
+      await _realtimeNotificationService.startForUser(uid);
 
       _isLoading = false;
       notifyListeners();
@@ -195,10 +203,14 @@ class AuthProvider with ChangeNotifier {
         _currentUser = User.fromJson(data, uid);
       }
 
+      await _notificationService.syncFcmTokenForUser(uid);
+      await _realtimeNotificationService.startForUser(uid);
+
       if (_currentUser!.role != _selectedRole) {
         RateLimitService.recordFailedLoginAttempt(sanitizedEmail);
 
         await _auth.signOut();
+        await _realtimeNotificationService.stop();
         _currentUser = null;
 
         _errorMessage = "Email ou mot de passe incorrect";
@@ -275,6 +287,8 @@ class AuthProvider with ChangeNotifier {
 
     if (doc.exists) {
       _currentUser = User.fromJson(doc.data()!, firebaseUser.uid);
+      await _notificationService.syncFcmTokenForUser(firebaseUser.uid);
+      await _realtimeNotificationService.startForUser(firebaseUser.uid);
       notifyListeners();
     }
   }
@@ -290,6 +304,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   Future<void> logout() async {
+    await _realtimeNotificationService.stop();
     await _auth.signOut();
     await AuthPreferencesService.clearRememberedSession();
     _rememberMe = false;
@@ -351,6 +366,8 @@ class AuthProvider with ChangeNotifier {
 
     if (doc.exists) {
       _currentUser = User.fromJson(doc.data()!, firebaseUser.uid);
+      await _notificationService.syncFcmTokenForUser(firebaseUser.uid);
+      await _realtimeNotificationService.startForUser(firebaseUser.uid);
       notifyListeners();
     }
   }

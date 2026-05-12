@@ -1,9 +1,23 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'dart:math';
 
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // Background handling entrypoint; app-specific processing can be added here.
+}
+
 class NotificationService {
+  NotificationService._();
+  static final NotificationService _instance = NotificationService._();
+  factory NotificationService() => _instance;
+
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   int _notificationIdCounter = 0;
 
   Future<void> initialize() async {
@@ -24,6 +38,52 @@ class NotificationService {
     );
 
     await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+
+    await _firebaseMessaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
+
+    await _firebaseMessaging.setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      final title = message.notification?.title ?? 'Nouvelle notification';
+      final body = message.notification?.body ?? 'Vous avez un nouveau message';
+      showNotification(title: title, body: body);
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      // Hook for navigation based on message.data if needed.
+    });
+  }
+
+  Future<String?> getFcmToken() async {
+    return _firebaseMessaging.getToken();
+  }
+
+  Future<void> syncFcmTokenForUser(String userId) async {
+    if (userId.isEmpty) return;
+
+    final token = await getFcmToken();
+    if (token == null || token.isEmpty) return;
+
+    await _firestore.collection('users').doc(userId).set({
+      'fcmToken': token,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    _firebaseMessaging.onTokenRefresh.listen((newToken) async {
+      await _firestore.collection('users').doc(userId).set({
+        'fcmToken': newToken,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    });
   }
 
   int _generateUniqueNotificationId() {

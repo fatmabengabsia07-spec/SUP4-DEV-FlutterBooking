@@ -65,12 +65,18 @@ class PendingReservationsScreen extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  "Réservation #${reservation.id.substring(0, 6)}",
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        "Réservation #${reservation.id.substring(0, 6)}",
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                                 const SizedBox(height: 8),
                                 Text("Ressource : ${reservation.resourceName}"),
@@ -91,11 +97,26 @@ class PendingReservationsScreen extends StatelessWidget {
                                             context: context,
                                             title: "Approuver la réservation",
                                             onConfirm: (comment) async {
-                                              await provider.approve(
+                                              final success =
+                                                  await provider.approve(
                                                 reservationId: reservation.id,
                                                 managerId: managerId,
                                                 comment: comment,
                                               );
+                                              if (!success && context.mounted) {
+                                                ScaffoldMessenger.of(context)
+                                                  ..hideCurrentSnackBar()
+                                                  ..showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        provider.error ??
+                                                            "Cette réservation a déjà été traitée.",
+                                                      ),
+                                                      backgroundColor:
+                                                          AppColors.error,
+                                                    ),
+                                                  );
+                                              }
                                             },
                                           );
                                         },
@@ -115,11 +136,26 @@ class PendingReservationsScreen extends StatelessWidget {
                                             context: context,
                                             title: "Refuser la réservation",
                                             onConfirm: (comment) async {
-                                              await provider.reject(
+                                              final success =
+                                                  await provider.reject(
                                                 reservationId: reservation.id,
                                                 managerId: managerId,
                                                 comment: comment,
                                               );
+                                              if (!success && context.mounted) {
+                                                ScaffoldMessenger.of(context)
+                                                  ..hideCurrentSnackBar()
+                                                  ..showSnackBar(
+                                                    SnackBar(
+                                                      content: Text(
+                                                        provider.error ??
+                                                            "Cette réservation a déjà été traitée.",
+                                                      ),
+                                                      backgroundColor:
+                                                          AppColors.error,
+                                                    ),
+                                                  );
+                                              }
                                             },
                                           );
                                         },
@@ -145,64 +181,64 @@ class PendingReservationsScreen extends StatelessWidget {
     );
   }
 
-void _showDecisionDialog({
-  required BuildContext context,
-  required String title,
-  required Future<void> Function(String? comment) onConfirm,
-}) {
-  final controller = TextEditingController();
+  void _showDecisionDialog({
+    required BuildContext context,
+    required String title,
+    required Future<void> Function(String? comment) onConfirm,
+  }) {
+    final controller = TextEditingController();
 
-  showDialog(
-    context: context,
-    builder: (_) => AlertDialog(
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.headline6?.copyWith(
-              color: AppColors.primary,
-            ),
-      ),
-      content: TextField(
-        controller: controller,
-        maxLines: 3,
-        decoration: InputDecoration(
-          hintText: "Ajouter un commentaire (optionnel)",
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12), 
-          ),
-          filled: true,
-          fillColor: AppColors.background, 
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text(
+          title,
+          style: Theme.of(context).textTheme.headline6?.copyWith(
+                color: AppColors.primary,
+              ),
         ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(
-            "Annuler",
-            style: TextStyle(
-              color: AppColors.primary, 
-            ),
-          ),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            await onConfirm(
-              controller.text.trim().isEmpty ? null : controller.text.trim(),
-            );
-            if (context.mounted) Navigator.pop(context);
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.success, 
-            shape: RoundedRectangleBorder(
+        content: TextField(
+          controller: controller,
+          maxLines: 3,
+          decoration: InputDecoration(
+            hintText: "Ajouter un commentaire (optionnel)",
+            border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-          ),
-          child: Text(
-            "Confirmer",
-            style: TextStyle(color: Colors.white), 
+            filled: true,
+            fillColor: AppColors.background,
           ),
         ),
-      ],
-    ),
-  );
-}
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              "Annuler",
+              style: TextStyle(
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              await onConfirm(
+                controller.text.trim().isEmpty ? null : controller.text.trim(),
+              );
+              if (context.mounted) Navigator.pop(context);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.success,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: Text(
+              "Confirmer",
+              style: TextStyle(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }

@@ -45,18 +45,25 @@ class ReservationProvider with ChangeNotifier {
       return false;
     }
 
+    final startAt = DateTime(
+      selectedDay.year,
+      selectedDay.month,
+      selectedDay.day,
+      selectedHour!,
+      0,
+    );
+
+    if (startAt.isBefore(DateTime.now())) {
+      error = "Impossible de réserver un créneau passé";
+      notifyListeners();
+      return false;
+    }
+
     loading = true;
     error = null;
     notifyListeners();
 
     try {
-      final startAt = DateTime(
-        selectedDay.year,
-        selectedDay.month,
-        selectedDay.day,
-        selectedHour!,
-        0,
-      );
       final endAt = startAt.add(Duration(minutes: durationMinutes));
 
       await _service.createReservation(
@@ -110,18 +117,24 @@ class ReservationProvider with ChangeNotifier {
       return false;
     }
 
+    final startAt = DateTime(
+      selectedDay.year,
+      selectedDay.month,
+      selectedDay.day,
+      selectedHour!,
+    );
+
+    if (startAt.isBefore(DateTime.now())) {
+      error = "Impossible de modifier vers un créneau passé";
+      notifyListeners();
+      return false;
+    }
+
     loading = true;
     error = null;
     notifyListeners();
 
     try {
-      final startAt = DateTime(
-        selectedDay.year,
-        selectedDay.month,
-        selectedDay.day,
-        selectedHour!,
-      );
-
       final endAt = startAt.add(Duration(minutes: durationMinutes));
 
       await _service.updateReservation(

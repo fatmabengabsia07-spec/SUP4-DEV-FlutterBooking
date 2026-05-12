@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+import '../../models/reservation.dart';
 import '../../models/resource.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
@@ -18,8 +19,6 @@ class ReservationScreen extends StatelessWidget {
     super.key,
     required this.resource,
   });
-
-  bool get requiresApproval => true;
 
   ImageProvider _getImageProvider(String url) {
     if (url.isNotEmpty) {
@@ -36,6 +35,12 @@ class ReservationScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rp = Provider.of<ReservationProvider>(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final auth = context.read<AuthProvider>();
+    final isManager = auth.currentUser?.role == UserRole.manager ||
+        auth.selectedRole == UserRole.manager;
+    final requiresApproval = !isManager;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -48,253 +53,278 @@ class ReservationScreen extends StatelessWidget {
           style: const TextStyle(color: AppColors.textPrimary),
         ),
       ),
-      body: Column(
-        children: [
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(16),
-                  ),
-                  child: Image(
-                    image: _getImageProvider(resource.imageUrl),
-                    height: 180,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        resource.name,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        resource.isSalle
-                            ? "${resource.type} • ${resource.capacity} pers."
-                            : resource.type,
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: TableCalendar(
-              firstDay: DateTime.now(),
-              lastDay: DateTime.now().add(const Duration(days: 120)),
-              focusedDay: rp.selectedDay,
-              selectedDayPredicate: (day) => isSameDay(day, rp.selectedDay),
-              onDaySelected: (selectedDay, focusedDay) {
-                rp.setDay(selectedDay);
-              },
-              calendarStyle: const CalendarStyle(
-                todayDecoration: BoxDecoration(
-                  color: AppColors.textPrimary,
-                  shape: BoxShape.circle,
-                ),
-                selectedDecoration: BoxDecoration(
-                  color: AppColors.primary,
-                  shape: BoxShape.circle,
-                ),
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(16),
               ),
-              headerStyle: const HeaderStyle(
-                formatButtonVisible: false,
-                titleCentered: true,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(16),
+                    ),
+                    child: Image(
+                      image: _getImageProvider(resource.imageUrl),
+                      height: 180,
+                      width: double.infinity,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          resource.name,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          resource.isSalle
+                              ? "${resource.type} • ${resource.capacity} pers."
+                              : resource.type,
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: Container(
+            const SizedBox(height: 12),
+            Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: AppColors.background,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: StreamBuilder(
-                stream: rp.reservationsForDay(resource.id),
-                builder: (context, snapshot) {
-                  final reservedHours = <int>{};
+              child: Builder(builder: (context) {
+                final firstDay = today;
+                final lastDay = today.add(const Duration(days: 365));
 
-                  if (snapshot.hasData) {
-                    final list = snapshot.data!;
-                    for (final r in list) {
-                      reservedHours.add(r.startAt.hour);
+                return TableCalendar(
+                  firstDay: firstDay,
+                  lastDay: lastDay,
+                  focusedDay:
+                      Provider.of<ReservationProvider>(context).selectedDay,
+                  selectedDayPredicate: (day) => isSameDay(day,
+                      Provider.of<ReservationProvider>(context).selectedDay),
+                  enabledDayPredicate: (day) {
+                    final normalized = DateTime(day.year, day.month, day.day);
+                    return !normalized.isBefore(today);
+                  },
+                  onDaySelected: (selectedDay, focusedDay) {
+                    Provider.of<ReservationProvider>(context, listen: false)
+                        .setDay(selectedDay);
+                  },
+                  calendarStyle: const CalendarStyle(
+                    todayDecoration: BoxDecoration(
+                      color: AppColors.textPrimary,
+                      shape: BoxShape.circle,
+                    ),
+                    selectedDecoration: BoxDecoration(
+                      color: AppColors.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  headerStyle: const HeaderStyle(
+                    formatButtonVisible: false,
+                    titleCentered: true,
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 12),
+            Consumer<ReservationProvider>(
+              builder: (context, rp, _) {
+                return StreamBuilder<List<Reservation>>(
+                  stream: rp.reservationsForDay(resource.id),
+                  builder: (context, snapshot) {
+                    final reservedHours = <int>{};
+
+                    if (snapshot.hasData) {
+                      final list = snapshot.data!;
+                      for (final r in list) {
+                        reservedHours.add(r.startAt.hour);
+                      }
                     }
-                  }
 
-                  final hours = List.generate(10, (i) => 8 + i);
+                    final hours = List.generate(10, (i) => 8 + i);
 
-                  return ListView.builder(
-                    itemCount: hours.length,
-                    itemBuilder: (context, index) {
-                      final h = hours[index];
-                      final isReserved = reservedHours.contains(h);
-                      final isSelected = rp.selectedHour == h;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Column(
+                        children: hours.map((h) {
+                          final isReserved = reservedHours.contains(h);
+                          final selectedDate = DateTime(
+                            rp.selectedDay.year,
+                            rp.selectedDay.month,
+                            rp.selectedDay.day,
+                          );
+                          final slotStart = DateTime(
+                            selectedDate.year,
+                            selectedDate.month,
+                            selectedDate.day,
+                            h,
+                          );
+                          final isPastHour = slotStart.isBefore(now);
+                          final isUnavailable = isReserved || isPastHour;
+                          final isSelected = rp.selectedHour == h;
 
-                      return GestureDetector(
-                        onTap: isReserved ? null : () => rp.setHour(h),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.textSecondary,
-                              width: isSelected ? 2 : 1,
-                            ),
-                            color: isReserved
-                                ? Colors.grey.shade200
-                                : (isSelected
-                                    ? Colors.red.shade50
-                                    : AppColors.background),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "${h.toString().padLeft(2, '0')}:00",
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  color: isReserved
-                                      ? AppColors.textSecondary
-                                      : AppColors.textPrimary,
-                                ),
+                          return GestureDetector(
+                            onTap: isUnavailable ? null : () => rp.setHour(h),
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
                               ),
-                              Text(
-                                isReserved
-                                    ? "Indisponible"
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isSelected
+                                      ? AppColors.primary
+                                      : AppColors.success,
+                                  width: isSelected ? 2 : 1,
+                                ),
+                                color: isUnavailable
+                                    ? Colors.grey.shade200
                                     : (isSelected
-                                        ? "Sélectionné"
-                                        : "Disponible"),
-                                style: TextStyle(
-                                  color: isReserved
-                                      ? AppColors.textSecondary
-                                      : AppColors.primary,
-                                ),
+                                        ? AppColors.primary.withOpacity(0.1)
+                                        : Colors.white),
                               ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  );
-                },
-              ),
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  Text(
+                                    "${h.toString().padLeft(2, '0')}:00",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: isUnavailable
+                                          ? Colors.grey
+                                          : Colors.black,
+                                    ),
+                                  ),
+                                  Text(
+                                    isReserved
+                                        ? "Indisponible"
+                                        : (isPastHour
+                                            ? "Passée"
+                                            : (isSelected
+                                                ? "Sélectionné"
+                                                : "Disponible")),
+                                    style: TextStyle(
+                                      color: isUnavailable
+                                          ? Colors.grey
+                                          : AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    );
+                  },
+                );
+              },
             ),
-          ),
-          if (rp.error != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(12),
-                margin: const EdgeInsets.only(bottom: 10),
-                decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red),
-                ),
-                child: Text(
-                  rp.error!,
-                  style: const TextStyle(color: Colors.red),
-                ),
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: double.infinity,
-              height: 52,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
+            if (rp.error != null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red),
+                  ),
+                  child: Text(
+                    rp.error!,
+                    style: const TextStyle(color: Colors.red),
                   ),
                 ),
-                onPressed: rp.loading
-                    ? null
-                    : () async {
-                        final uid = firebase_auth
-                            .FirebaseAuth.instance.currentUser?.uid;
+              ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  onPressed: rp.loading
+                      ? null
+                      : () async {
+                          final uid = firebase_auth
+                              .FirebaseAuth.instance.currentUser?.uid;
 
-                        if (uid == null) return;
+                          if (uid == null) return;
 
-                        if (rp.selectedHour == null) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Veuillez choisir une heure"),
-                            ),
+                          if (rp.selectedHour == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text("Veuillez choisir une heure"),
+                              ),
+                            );
+                            return;
+                          }
+
+                          final ok = await rp.confirmReservation(
+                            resourceId: resource.id,
+                            userId: uid,
+                            requiresApproval: requiresApproval,
+                            durationMinutes: 60,
                           );
-                          return;
-                        }
 
-                        final ok = await rp.confirmReservation(
-                          resourceId: resource.id,
-                          userId: uid,
-                          requiresApproval: requiresApproval,
-                          durationMinutes: 60,
-                        );
-
-                        if (ok && context.mounted) {
-                          showDialog(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (_) => _SuccessDialog(
-                              resource: resource,
-                              selectedDay: rp.selectedDay,
-                              selectedHour: rp.selectedHour!,
-                            ),
-                          );
-                        }
-                      },
-                child: rp.loading
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text(
-                        "Continuer",
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          if (ok && context.mounted) {
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => _SuccessDialog(
+                                resource: resource,
+                                selectedDay: rp.selectedDay,
+                                selectedHour: rp.selectedHour!,
+                              ),
+                            );
+                          }
+                        },
+                  child: rp.loading
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text(
+                          "Continuer",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -366,6 +396,17 @@ class _SuccessDialog extends StatelessWidget {
             "${selectedHour.toString().padLeft(2, '0')}:00 - ${(selectedHour + 1).toString().padLeft(2, '0')}:00",
             textAlign: TextAlign.center,
           ),
+          if (userRole == UserRole.manager) ...[
+            const SizedBox(height: 10),
+            const Text(
+              "Réservation approuvée automatiquement.",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.success,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: 20),
           Padding(
             padding: const EdgeInsets.symmetric(
@@ -393,7 +434,10 @@ class _SuccessDialog extends StatelessWidget {
                     MaterialPageRoute(
                       builder: (_) => HomeScreen(
                         role: userRole,
-                        initialIndex: userRole == UserRole.user ? 1 : 0,
+                        initialIndex: userRole == UserRole.manager ||
+                                userRole == UserRole.user
+                            ? 1
+                            : 0,
                       ),
                     ),
                     (route) => false,

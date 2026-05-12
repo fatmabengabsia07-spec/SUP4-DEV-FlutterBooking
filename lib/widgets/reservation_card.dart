@@ -139,7 +139,8 @@ class ReservationCard extends StatelessWidget {
                 children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: status == ReservationStatus.cancelled
+                      onPressed: (status == ReservationStatus.cancelled ||
+                              status == ReservationStatus.approved)
                           ? null
                           : () {
                               Navigator.push(
